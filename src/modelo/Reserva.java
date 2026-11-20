@@ -10,6 +10,30 @@ public class Reserva {
     private int duracion;         // 1, 2 o 3 horas
     private String estado;        // "Pendiente", "Confirmada", "En Juego", "Finalizada", "Cancelada"
     private double adelantoPagado;
+    
+    
+    
+    // En Reserva.java:
+    private Empleado recepcionista;      // Quien registró la reserva
+    private Empleado encargadoCancha;    // Quien dio inicio / supervisó
+
+// Getters y Setters:
+    public Empleado getRecepcionista() {
+        return recepcionista;
+    }
+
+    public void setRecepcionista(Empleado recepcionista) {
+        this.recepcionista = recepcionista;
+    }
+
+    public Empleado getEncargadoCancha() {
+        return encargadoCancha;
+    }
+
+    public void setEncargadoCancha(Empleado encargadoCancha) {
+        this.encargadoCancha = encargadoCancha;
+    }
+
 
     // 2. Arreglo de participantes (valida aforo según capacidad de la cancha)
     private String[] participantes;
