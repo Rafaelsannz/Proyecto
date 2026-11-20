@@ -1,54 +1,35 @@
 package modelo;
 
 public class Reserva {
-    // 1. Atributos principales de la reserva (RF05 y RF06)
     private int numeroCorrelativo;
     private Jugador titular;
     private Cancha cancha;
-    private String fecha;         // Formato "YYYY-MM-DD"
-    private int horaInicio;       // Rango de 8 a 23
-    private int duracion;         // 1, 2 o 3 horas
-    private String estado;        // "Pendiente", "Confirmada", "En Juego", "Finalizada", "Cancelada"
+    private String fecha; // Formato "YYYY-MM-DD"
+    private int horaInicio; // Rango de 8 a 23
+    private int duracion; // 1, 2 o 3 horas
+    private String estado; // "Pendiente", "Confirmada", "En Juego", "Finalizada", "Cancelada"
     private double adelantoPagado;
-    
-    
-    
-    // En Reserva.java:
-    private Empleado recepcionista;      // Quien registró la reserva
-    private Empleado encargadoCancha;    // Quien dio inicio / supervisó
+    private double adelantoDevuelto;
 
-// Getters y Setters:
-    public Empleado getRecepcionista() {
-        return recepcionista;
-    }
+    private Empleado recepcionista;
+    private Empleado encargadoCancha;
 
-    public void setRecepcionista(Empleado recepcionista) {
-        this.recepcionista = recepcionista;
-    }
-
-    public Empleado getEncargadoCancha() {
-        return encargadoCancha;
-    }
-
-    public void setEncargadoCancha(Empleado encargadoCancha) {
-        this.encargadoCancha = encargadoCancha;
-    }
-
-
-    // 2. Arreglo de participantes (valida aforo según capacidad de la cancha)
     private String[] participantes;
     private int cantParticipantes;
 
-    // 3. Arreglos para Servicios Adicionales (capacidad fija de 10 consumos)
     private ServicioAdicional[] serviciosContratados;
     private int[] cantidadesServicios;
     private int cantServiciosAgregados;
 
-    // 4. Arreglos para Paquetes Promocionales (capacidad fija de 5 paquetes)
     private PaquetePromocional[] paquetesContratados;
     private int cantPaquetesAgregados;
 
-    // CONSTRUCTOR
+    private Incidencia[] incidencias;
+    private int cantIncidencias;
+
+    private String[] historialEstados;
+    private int cantHistorial;
+
     public Reserva(int numeroCorrelativo, Jugador titular, Cancha cancha, String fecha,
                    int horaInicio, int duracion) {
         this.numeroCorrelativo = numeroCorrelativo;
@@ -59,11 +40,11 @@ public class Reserva {
         this.duracion = duracion;
         this.estado = "Pendiente";
         this.adelantoPagado = 0.0;
+        this.adelantoDevuelto = 0.0;
 
         this.participantes = new String[cancha.getCapacidadMax()];
         this.cantParticipantes = 0;
 
-// LÍNEAS CORREGIDAS (con corchetes y número adentro):
         this.serviciosContratados = new ServicioAdicional[10];
         this.cantidadesServicios = new int[10];
         this.cantServiciosAgregados = 0;
@@ -71,14 +52,30 @@ public class Reserva {
         this.paquetesContratados = new PaquetePromocional[5];
         this.cantPaquetesAgregados = 0;
 
+        this.incidencias = new Incidencia[10];
+        this.cantIncidencias = 0;
+
+        this.historialEstados = new String[20];
+        this.cantHistorial = 0;
+        registrarHistorial("Creada -> Pendiente");
+    }
+
+    private void registrarHistorial(String evento) {
+        if (cantHistorial < historialEstados.length) {
+            historialEstados[cantHistorial++] = evento;
+        }
+    }
+
+    public boolean estaCerrada() {
+        return estado.equals("Finalizada") || estado.equals("Cancelada");
     }
 
     // ========================================================
-    // MÉTODOS PARA AÑADIR A LA RESERVA
+    // MÉTODOS PARA AÑADIR ELEMENTOS A LA RESERVA
     // ========================================================
 
-    // Añade participante respetando el aforo máximo de la cancha
     public boolean agregarParticipante(String nombreOIdentificacion) {
+        if (estaCerrada()) return false;
         if (cantParticipantes < participantes.length) {
             participantes[cantParticipantes++] = nombreOIdentificacion;
             return true;
@@ -86,11 +83,10 @@ public class Reserva {
         return false;
     }
 
-    // Añade servicio individual verificando capacidad y stock en almacén
     public boolean agregarServicio(ServicioAdicional servicio, int cantidadPedida) {
-        if (cantServiciosAgregados >= serviciosContratados.length) {
-            return false;
-        }
+        if (estaCerrada() || cantidadPedida <= 0) return false;
+        if (cantServiciosAgregados >= serviciosContratados.length) return false;
+
         if (servicio.hayStock(cantidadPedida)) {
             serviciosContratados[cantServiciosAgregados] = servicio;
             cantidadesServicios[cantServiciosAgregados] = cantidadPedida;
@@ -101,17 +97,25 @@ public class Reserva {
         return false;
     }
 
-    // Añade paquete cerrado verificando stock conjunto
     public boolean agregarPaquete(PaquetePromocional paquete) {
-        if (cantPaquetesAgregados >= paquetesContratados.length) {
-            return false;
-        }
+        if (estaCerrada()) return false;
+        if (cantPaquetesAgregados >= paquetesContratados.length) return false;
+
         if (paquete.validarStockServicios()) {
             paquetesContratados[cantPaquetesAgregados++] = paquete;
             paquete.descontarStockPaquete();
             return true;
         }
         return false;
+    }
+
+    public boolean agregarIncidencia(Incidencia incidencia) {
+        if (estaCerrada() || incidencia == null) return false;
+        if (cantIncidencias >= incidencias.length) return false;
+
+        incidencias[cantIncidencias++] = incidencia;
+        registrarHistorial("Incidencia registrada: " + incidencia.toString());
+        return true;
     }
 
     // ========================================================
@@ -122,31 +126,52 @@ public class Reserva {
         return horaInicio + duracion;
     }
 
-    // Alquiler con tarifa nocturna (Cancha) y descuento por fidelización (Jugador)
-    public double calcularCostoAlquiler() {
-        double subtotal = 0.0;
+    public double calcularAlquilerBruto() {
+        double bruto = 0.0;
         for (int h = horaInicio; h < getHoraFin(); h++) {
-            subtotal += cancha.calcularTarifaHora(h);
+            bruto += cancha.calcularTarifaHora(h);
         }
-        double descuento = subtotal * titular.getPorcentajeDescuento();
-        return subtotal - descuento;
+        return bruto;
     }
 
-    // Total de consumos adicionales (servicios individuales + paquetes cerrados)
-    public double calcularTotalAdicionales() {
+    public double calcularDescuentoAlquiler() {
+        return calcularAlquilerBruto() * titular.getPorcentajeDescuento();
+    }
+
+    public double calcularCostoAlquiler() {
+        return calcularAlquilerBruto() - calcularDescuentoAlquiler();
+    }
+
+    public double calcularTotalServicios() {
         double total = 0.0;
         for (int i = 0; i < cantServiciosAgregados; i++) {
             total += serviciosContratados[i].getPrecioUnitario() * cantidadesServicios[i];
         }
+        return total;
+    }
+
+    public double calcularTotalPaquetes() {
+        double total = 0.0;
         for (int i = 0; i < cantPaquetesAgregados; i++) {
             total += paquetesContratados[i].getPrecioPromocional();
         }
         return total;
     }
 
-    // Monto general antes de liquidar
+    public double calcularTotalAdicionales() {
+        return calcularTotalServicios() + calcularTotalPaquetes();
+    }
+
+    public double calcularTotalIncidencias() {
+        double total = 0.0;
+        for (int i = 0; i < cantIncidencias; i++) {
+            total += incidencias[i].getMonto();
+        }
+        return total;
+    }
+
     public double calcularMontoTotal() {
-        return calcularCostoAlquiler() + calcularTotalAdicionales();
+        return calcularCostoAlquiler() + calcularTotalAdicionales() + calcularTotalIncidencias();
     }
 
     // ========================================================
@@ -155,8 +180,10 @@ public class Reserva {
 
     public boolean registrarAdelanto() {
         if (this.estado.equals("Pendiente")) {
-            this.adelantoPagado = calcularCostoAlquiler() * 0.50; // 50% de adelanto
+            this.adelantoPagado = calcularCostoAlquiler() * 0.50;
             this.estado = "Confirmada";
+            registrarHistorial("Pendiente -> Confirmada (Adelanto S/. " +
+                    String.format("%.2f", adelantoPagado) + ")");
             return true;
         }
         return false;
@@ -166,6 +193,7 @@ public class Reserva {
         if (this.estado.equals("Confirmada")) {
             this.estado = "En Juego";
             this.cancha.setEstado("Ocupada");
+            registrarHistorial("Confirmada -> En Juego (Cancha Ocupada)");
             return true;
         }
         return false;
@@ -175,57 +203,102 @@ public class Reserva {
         if (this.estado.equals("En Juego")) {
             this.estado = "Finalizada";
             this.cancha.setEstado("Disponible");
+            registrarHistorial("En Juego -> Finalizada (Cancha Disponible)");
             return true;
         }
         return false;
     }
 
-    public boolean cancelarReserva() {
+    // Sobrecarga (Semana 7): cancelación indicando si cumple >= 24h de anticipación
+    public boolean cancelarReserva(boolean con24HorasAnticipacion) {
         if (this.estado.equals("Pendiente") || this.estado.equals("Confirmada")) {
+            String estadoAnterior = this.estado;
             this.estado = "Cancelada";
-            this.cancha.setEstado("Disponible");
-            // Devuelve el stock de los servicios contratados
+
+            // Repone stock de servicios individuales y paquetes contratados
             for (int i = 0; i < cantServiciosAgregados; i++) {
                 serviciosContratados[i].reponerStock(cantidadesServicios[i]);
+            }
+            for (int i = 0; i < cantPaquetesAgregados; i++) {
+                paquetesContratados[i].reponerStockPaquete();
+            }
+
+            if (estadoAnterior.equals("Confirmada")) {
+                if (con24HorasAnticipacion) {
+                    this.adelantoDevuelto = this.adelantoPagado;
+                    registrarHistorial("Confirmada -> Cancelada (>=24h: adelanto devuelto S/. " +
+                            String.format("%.2f", adelantoDevuelto) + ")");
+                } else {
+                    this.adelantoDevuelto = 0.0;
+                    registrarHistorial("Confirmada -> Cancelada (<24h: adelanto retenido S/. " +
+                            String.format("%.2f", adelantoPagado) + ")");
+                }
+            } else {
+                registrarHistorial("Pendiente -> Cancelada");
             }
             return true;
         }
         return false;
     }
 
+    public boolean cancelarReserva() {
+        return cancelarReserva(true);
+    }
+
     // ========================================================
-    // GETTERS Y MÉTODOS DE CONSULTA
+    // GETTERS, SETTERS Y CONSULTAS
     // ========================================================
+
     public int getNumeroCorrelativo() { return numeroCorrelativo; }
     public Jugador getTitular() { return titular; }
+    public void setTitular(Jugador titular) { this.titular = titular; }
     public Cancha getCancha() { return cancha; }
     public String getFecha() { return fecha; }
     public int getHoraInicio() { return horaInicio; }
     public int getDuracion() { return duracion; }
     public String getEstado() { return estado; }
     public double getAdelantoPagado() { return adelantoPagado; }
+    public double getAdelantoDevuelto() { return adelantoDevuelto; }
+    public Empleado getRecepcionista() { return recepcionista; }
+    public void setRecepcionista(Empleado recepcionista) { this.recepcionista = recepcionista; }
+    public Empleado getEncargadoCancha() { return encargadoCancha; }
+    public void setEncargadoCancha(Empleado encargadoCancha) { this.encargadoCancha = encargadoCancha; }
     public int getCantParticipantes() { return cantParticipantes; }
     public int getCantServiciosAgregados() { return cantServiciosAgregados; }
     public int getCantPaquetesAgregados() { return cantPaquetesAgregados; }
+    public int getCantIncidencias() { return cantIncidencias; }
+    public int getCantHistorial() { return cantHistorial; }
 
     public ServicioAdicional obtenerServicio(int index) {
-        if (index >= 0 && index < cantServiciosAgregados) {
-            return serviciosContratados[index];
-        }
+        if (index >= 0 && index < cantServiciosAgregados) return serviciosContratados[index];
         return null;
     }
 
     public int obtenerCantidadServicio(int index) {
-        if (index >= 0 && index < cantServiciosAgregados) {
-            return cantidadesServicios[index];
-        }
+        if (index >= 0 && index < cantServiciosAgregados) return cantidadesServicios[index];
         return 0;
     }
 
     public PaquetePromocional obtenerPaquete(int index) {
-        if (index >= 0 && index < cantPaquetesAgregados) {
-            return paquetesContratados[index];
-        }
+        if (index >= 0 && index < cantPaquetesAgregados) return paquetesContratados[index];
         return null;
+    }
+
+    public Incidencia obtenerIncidencia(int index) {
+        if (index >= 0 && index < cantIncidencias) return incidencias[index];
+        return null;
+    }
+
+    public String obtenerHistorial(int index) {
+        if (index >= 0 && index < cantHistorial) return historialEstados[index];
+        return null;
+    }
+
+    public String getHistorialTexto() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < cantHistorial; i++) {
+            sb.append((i + 1)).append(". ").append(historialEstados[i]).append("\n");
+        }
+        return sb.toString();
     }
 }

@@ -20,100 +20,107 @@ public class ReportesGerenciales {
     }
 
     // =========================================================================
-    // 1. REPORTE DE OCUPACIÓN POR CANCHA (Horas y % en una fecha)
+    // 1. OCUPACIÓN POR CANCHA EN RANGO DE FECHAS (Datos para JTable + Total)
     // =========================================================================
-    public void generarReporteOcupacion(String fecha) {
-        System.out.println("====================================================================");
-        System.out.println("          REPORTE 1: OCUPACIÓN POR CANCHA - FECHA: " + fecha);
-        System.out.println("====================================================================");
-        System.out.printf("%-10s %-15s %-12s %-15s %-15s\n",
-                          "CÓDIGO", "NOMBRE", "TIPO", "HORAS OCUPADAS", "% OCUPACIÓN");
-        System.out.println("--------------------------------------------------------------------");
+    public Object[][] obtenerDatosOcupacion(String fechaInicio, String fechaFin, int diasRango) {
+        int n = gestionCanchas.getCantidad();
+        Object[][] datos = new Object[n + 1][5];
+        if (diasRango < 1) diasRango = 1;
 
-        // El horario operativo va de 08:00 a 23:00 -> 15 horas posibles por día
-        final double HORAS_TOTALES_DIA = 15.0;
+        final double horasDisponiblesPorCancha = 15.0 * diasRango;
+        int totalHoras = 0;
 
-        for (int i = 0; i < gestionCanchas.getCantidad(); i++) {
+        for (int i = 0; i < n; i++) {
             Cancha c = gestionCanchas.obtener(i);
             int horasReservadas = 0;
 
-            // Recorrer las reservas para sumar las horas en esa fecha
             for (int j = 0; j < gestionReservas.getCantidad(); j++) {
                 Reserva r = gestionReservas.obtener(j);
                 if (r.getCancha().getCodigo().equalsIgnoreCase(c.getCodigo()) &&
-                    r.getFecha().equals(fecha) &&
-                    !r.getEstado().equalsIgnoreCase("Cancelada")) {
+                    !r.getEstado().equalsIgnoreCase("Cancelada") &&
+                    r.getFecha().compareTo(fechaInicio) >= 0 &&
+                    r.getFecha().compareTo(fechaFin) <= 0) {
                     horasReservadas += r.getDuracion();
                 }
             }
 
-            double porcentaje = (horasReservadas / HORAS_TOTALES_DIA) * 100.0;
-            System.out.printf("%-10s %-15s %-12s %-15d %6.2f%%\n",
-                              c.getCodigo(), c.getNombre(), c.getTipo(), horasReservadas, porcentaje);
+            totalHoras += horasReservadas;
+            double porcentaje = (horasReservadas / horasDisponiblesPorCancha) * 100.0;
+
+            datos[i][0] = c.getCodigo();
+            datos[i][1] = c.getNombre();
+            datos[i][2] = c.getTipo();
+            datos[i][3] = horasReservadas;
+            datos[i][4] = String.format("%.2f%%", porcentaje);
         }
-        System.out.println("====================================================================\n");
+
+        double pctGlobal = (n == 0) ? 0.0 : (totalHoras / (horasDisponiblesPorCancha * n)) * 100.0;
+        datos[n][0] = "TOTAL";
+        datos[n][1] = n + " cancha(s)";
+        datos[n][2] = "-";
+        datos[n][3] = totalHoras;
+        datos[n][4] = String.format("%.2f%%", pctGlobal);
+
+        return datos;
     }
 
     // =========================================================================
-    // 2. REPORTE DE PRODUCTIVIDAD DEL PERSONAL
+    // 2. PRODUCTIVIDAD DEL PERSONAL (Datos para JTable + Total)
     // =========================================================================
-    public void generarReporteProductividad() {
-        System.out.println("====================================================================");
-        System.out.println("          REPORTE 2: PRODUCTIVIDAD DEL PERSONAL");
-        System.out.println("====================================================================");
-        System.out.printf("%-10s %-25s %-20s %-10s\n", "DNI", "NOMBRE COMPLETO", "ROL", "PARTICIPACIONES");
-        System.out.println("--------------------------------------------------------------------");
+    public Object[][] obtenerDatosProductividad() {
+        int n = gestionPersonal.getCantidad();
+        Object[][] datos = new Object[n + 1][5];
 
-        for (int i = 0; i < gestionPersonal.getCantidad(); i++) {
+        int totalRegistradas = 0;
+        int totalSupervisados = 0;
+
+        for (int i = 0; i < n; i++) {
             Empleado emp = gestionPersonal.obtener(i);
-            int contadorActividad = 0;
+            int registradas = 0;
+            int supervisados = 0;
 
             for (int j = 0; j < gestionReservas.getCantidad(); j++) {
                 Reserva r = gestionReservas.obtener(j);
-
-                // Si es recepcionista y registró la reserva
                 if (r.getRecepcionista() != null &&
                     r.getRecepcionista().getDni().equalsIgnoreCase(emp.getDni())) {
-                    contadorActividad++;
+                    registradas++;
                 }
-                // Si es encargado y supervisó el partido
                 if (r.getEncargadoCancha() != null &&
                     r.getEncargadoCancha().getDni().equalsIgnoreCase(emp.getDni())) {
-                    contadorActividad++;
+                    supervisados++;
                 }
             }
 
-            String nombreCompleto = emp.getNombres() + " " + emp.getApellidos();
-            System.out.printf("%-10s %-25s %-20s %-10d\n",
-                              emp.getDni(), nombreCompleto, emp.getRol(), contadorActividad);
+            totalRegistradas += registradas;
+            totalSupervisados += supervisados;
+
+            datos[i][0] = emp.getDni();
+            datos[i][1] = emp.getNombres() + " " + emp.getApellidos();
+            datos[i][2] = emp.getRol();
+            datos[i][3] = registradas;
+            datos[i][4] = supervisados;
         }
-        System.out.println("====================================================================\n");
+
+        datos[n][0] = "TOTAL";
+        datos[n][1] = n + " empleado(s)";
+        datos[n][2] = "-";
+        datos[n][3] = totalRegistradas;
+        datos[n][4] = totalSupervisados;
+
+        return datos;
     }
 
     // =========================================================================
-    // 3. REPORTE TOP JUGADORES (Ordenamiento Burbuja por reservas finalizadas)
+    // 3. TOP JUGADORES CON MÁS RESERVAS FINALIZADAS (Burbuja + Total)
     // =========================================================================
-    public void generarReporteTopJugadores() {
-        System.out.println("====================================================================");
-        System.out.println("          REPORTE 3: TOP JUGADORES CON MÁS RESERVAS FINALIZADAS");
-        System.out.println("====================================================================");
-        System.out.printf("%-10s %-25s %-15s %-10s\n", "DNI", "NOMBRE COMPLETO", "CATEGORÍA", "FINALIZADAS");
-        System.out.println("--------------------------------------------------------------------");
-
+    public Object[][] obtenerDatosTopJugadores() {
         int n = gestionJugadores.getCantidad();
-        if (n == 0) {
-            System.out.println("No hay jugadores registrados en el sistema.");
-            System.out.println("====================================================================\n");
-            return;
-        }
-
-        // Crear una copia temporal de referencias para no desordenar el arreglo principal
         Jugador[] ranking = new Jugador[n];
         for (int i = 0; i < n; i++) {
             ranking[i] = gestionJugadores.obtener(i);
         }
 
-        // Algoritmo de Ordenamiento Burbuja: De Mayor a Menor
+        // Ordenamiento Burbuja descendente (Semana 3)
         for (int i = 0; i < n - 1; i++) {
             for (int j = 0; j < n - 1 - i; j++) {
                 if (ranking[j].getReservasFinalizadas() < ranking[j + 1].getReservasFinalizadas()) {
@@ -124,60 +131,87 @@ public class ReportesGerenciales {
             }
         }
 
-        // Mostrar el listado ordenado
+        Object[][] datos = new Object[n + 1][5];
+        int totalFinalizadas = 0;
+
         for (int i = 0; i < n; i++) {
-            String nombre = ranking[i].getNombres() + " " + ranking[i].getApellidos();
-            System.out.printf("%-10s %-25s %-15s %-10d\n",
-                              ranking[i].getDni(), nombre, ranking[i].getTipo(),
-                              ranking[i].getReservasFinalizadas());
+            totalFinalizadas += ranking[i].getReservasFinalizadas();
+            datos[i][0] = i + 1;
+            datos[i][1] = ranking[i].getDni();
+            datos[i][2] = ranking[i].getNombres() + " " + ranking[i].getApellidos();
+            datos[i][3] = ranking[i].getTipo();
+            datos[i][4] = ranking[i].getReservasFinalizadas();
         }
-        System.out.println("====================================================================\n");
+
+        datos[n][0] = "-";
+        datos[n][1] = "TOTAL";
+        datos[n][2] = n + " jugador(es)";
+        datos[n][3] = "-";
+        datos[n][4] = totalFinalizadas;
+
+        return datos;
     }
 
     // =========================================================================
-    // 4. REPORTE DE INGRESOS DETALLADO POR CONCEPTOS
+    // 4. INGRESOS DESGLOSADOS EN RANGO DE FECHAS (Datos para JTable + Total)
     // =========================================================================
-    public void generarReporteIngresosDetallado(String fechaInicio, String fechaFin) {
-        System.out.println("====================================================================");
-        System.out.println("          REPORTE 4: INGRESOS DESGLOSADOS POR CONCEPTO");
-        System.out.println("Rango: " + fechaInicio + " hasta " + fechaFin);
-        System.out.println("====================================================================");
-
-        double totalAlquilerCanchas = 0.0;
-        double totalServiciosAdicionales = 0.0;
+    public Object[][] obtenerDatosIngresos(String fechaInicio, String fechaFin) {
+        double totalAlquiler = 0.0;
+        double totalServicios = 0.0;
         double totalPaquetes = 0.0;
+        double totalIncidencias = 0.0;
 
         for (int i = 0; i < gestionReservas.getCantidad(); i++) {
             Reserva r = gestionReservas.obtener(i);
 
-            // Consideramos reservas que no estén canceladas y dentro del rango de fechas
-            if (!r.getEstado().equalsIgnoreCase("Cancelada") &&
+            if (r.getEstado().equalsIgnoreCase("Finalizada") &&
                 r.getFecha().compareTo(fechaInicio) >= 0 &&
                 r.getFecha().compareTo(fechaFin) <= 0) {
 
-                // A. Alquiler de Cancha
-                totalAlquilerCanchas += r.calcularCostoAlquiler();
-
-                // B. Servicios individuales
-                for (int s = 0; s < r.getCantServiciosAgregados(); s++) {
-                    totalServiciosAdicionales += r.obtenerServicio(s).getPrecioUnitario()
-                                                 * r.obtenerCantidadServicio(s);
-                }
-
-                // C. Paquetes cerrados
-                for (int p = 0; p < r.getCantPaquetesAgregados(); p++) {
-                    totalPaquetes += r.obtenerPaquete(p).getPrecioPromocional();
-                }
+                totalAlquiler += r.calcularCostoAlquiler();
+                totalServicios += r.calcularTotalServicios();
+                totalPaquetes += r.calcularTotalPaquetes();
+                totalIncidencias += r.calcularTotalIncidencias();
             }
         }
 
-        double totalGeneral = totalAlquilerCanchas + totalServiciosAdicionales + totalPaquetes;
+        double totalGeneral = totalAlquiler + totalServicios + totalPaquetes + totalIncidencias;
 
-        System.out.printf("  * Total Alquiler de Canchas:        S/. %10.2f\n", totalAlquilerCanchas);
-        System.out.printf("  * Total Servicios Adicionales:      S/. %10.2f\n", totalServiciosAdicionales);
-        System.out.printf("  * Total Paquetes Promocionales:     S/. %10.2f\n", totalPaquetes);
-        System.out.println("--------------------------------------------------------------------");
-        System.out.printf("  TOTAL GENERAL DE INGRESOS (Neto):   S/. %10.2f\n", totalGeneral);
-        System.out.println("====================================================================\n");
+        return new Object[][] {
+            {"Alquiler de Canchas (neto de descuentos)", String.format("S/. %.2f", totalAlquiler)},
+            {"Servicios Adicionales", String.format("S/. %.2f", totalServicios)},
+            {"Paquetes Promocionales", String.format("S/. %.2f", totalPaquetes)},
+            {"Cargos por Incidencias", String.format("S/. %.2f", totalIncidencias)},
+            {"TOTAL GENERAL DE INGRESOS", String.format("S/. %.2f", totalGeneral)}
+        };
+    }
+
+    // Métodos de consola mantenidos por compatibilidad
+    public void generarReporteOcupacion(String fecha) {
+        Object[][] datos = obtenerDatosOcupacion(fecha, fecha, 1);
+        for (Object[] fila : datos) {
+            System.out.println(fila[0] + " | " + fila[1] + " | " + fila[2] + " | " + fila[3] + "h | " + fila[4]);
+        }
+    }
+
+    public void generarReporteProductividad() {
+        Object[][] datos = obtenerDatosProductividad();
+        for (Object[] fila : datos) {
+            System.out.println(fila[0] + " | " + fila[1] + " | " + fila[2] + " | Reg: " + fila[3] + " | Sup: " + fila[4]);
+        }
+    }
+
+    public void generarReporteTopJugadores() {
+        Object[][] datos = obtenerDatosTopJugadores();
+        for (Object[] fila : datos) {
+            System.out.println(fila[0] + " | " + fila[1] + " | " + fila[2] + " | " + fila[3] + " | " + fila[4]);
+        }
+    }
+
+    public void generarReporteIngresosDetallado(String fechaInicio, String fechaFin) {
+        Object[][] datos = obtenerDatosIngresos(fechaInicio, fechaFin);
+        for (Object[] fila : datos) {
+            System.out.println(fila[0] + ": " + fila[1]);
+        }
     }
 }

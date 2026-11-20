@@ -1,6 +1,7 @@
 package controlador;
 
 import modelo.Cancha;
+import modelo.Empleado;
 import modelo.Jugador;
 import modelo.Reserva;
 
@@ -10,9 +11,9 @@ public class GestionReservas {
     private int contadorCorrelativo;
 
     public GestionReservas(int capacidad) {
-        this.lista = new Reserva[capacidad]; // Colección en memoria fija
+        this.lista = new Reserva[capacidad];
         this.cantidad = 0;
-        this.contadorCorrelativo = 1001;     // Número correlativo inicial
+        this.contadorCorrelativo = 1001;
     }
 
     public int getCantidad() { return cantidad; }
@@ -22,20 +23,24 @@ public class GestionReservas {
         return null;
     }
 
-    // Validación A: Rango de atención 08:00 a 23:00 y duración de 1 a 3 horas (RF05)
+    public Reserva obtenerUltimaReserva() {
+        if (cantidad > 0) return lista[cantidad - 1];
+        return null;
+    }
+
+    // Validación A: Rango 08:00 a 23:00 y duración 1 a 3 horas (RF05)
     public boolean validarHorarioAtencion(int horaInicio, int duracion) {
         if (duracion < 1 || duracion > 3) return false;
         int horaFin = horaInicio + duracion;
         return (horaInicio >= 8 && horaFin <= 23);
     }
 
-    // Validación B: Sin cruces de horario para la misma cancha y fecha (RF05)
-    public boolean hayCruceHorario(String codCancha, String fecha, int horaInicio, int duracion) {
+    // Busca la reserva exacta con la que existe cruce (RF05)
+    public Reserva buscarReservaEnCruce(String codCancha, String fecha, int horaInicio, int duracion) {
         int horaFinNueva = horaInicio + duracion;
 
         for (int i = 0; i < cantidad; i++) {
             Reserva r = lista[i];
-            // Solo comparamos si es la misma cancha, misma fecha y no está cancelada
             if (r.getCancha().getCodigo().equalsIgnoreCase(codCancha) &&
                 r.getFecha().equals(fecha) &&
                 !r.getEstado().equals("Cancelada")) {
@@ -43,45 +48,84 @@ public class GestionReservas {
                 int inicioExistente = r.getHoraInicio();
                 int finExistente = r.getHoraFin();
 
-                // Condición de traslape:
-                // (InicioNueva < FinExistente) Y (FinNueva > InicioExistente)
                 if (horaInicio < finExistente && horaFinNueva > inicioExistente) {
-                    return true; // Existe cruce de horario
+                    return r;
                 }
             }
         }
-        return false;
+        return null;
     }
 
-    // REGISTRAR RESERVA (RF05)
-    // Retorna String vacío "" si fue exitoso, o el mensaje exacto de rechazo
+    public boolean hayCruceHorario(String codCancha, String fecha, int horaInicio, int duracion) {
+        return buscarReservaEnCruce(codCancha, fecha, horaInicio, duracion) != null;
+    }
+
+    // Para la vista de agenda diaria: verifica si una hora puntual está ocupada (RF11)
+    public Reserva buscarReservaEnHora(String codCancha, String fecha, int hora) {
+        for (int i = 0; i < cantidad; i++) {
+            Reserva r = lista[i];
+            if (r.getCancha().getCodigo().equalsIgnoreCase(codCancha) &&
+                r.getFecha().equals(fecha) &&
+                !r.getEstado().equals("Cancelada")) {
+                if (hora >= r.getHoraInicio() && hora < r.getHoraFin()) {
+                    return r;
+                }
+            }
+        }
+        return null;
+    }
+
+    // REGISTRAR RESERVA CON RECEPCIONISTA (RF05 + RF08)
     public String registrarReserva(Jugador titular, Cancha cancha, String fecha,
-                                   int horaInicio, int duracion, int cantParticipantes) {
+                                   int horaInicio, int duracion, int cantParticipantes,
+                                   Empleado recepcionista) {
         if (cantidad >= lista.length) {
             return "Error: Capacidad máxima del sistema de reservas alcanzada.";
+        }
+        if (titular == null || cancha == null) {
+            return "Rechazo: Debe seleccionar un jugador titular y una cancha válidos.";
         }
         if (cancha.getEstado().equalsIgnoreCase("En Mantenimiento")) {
             return "Rechazo: La cancha " + cancha.getCodigo() + " se encuentra En Mantenimiento.";
         }
         if (!validarHorarioAtencion(horaInicio, duracion)) {
-            return "Rechazo: El horario debe ser entre las 08:00 y las 23:00 (duración de 1 a 3 horas).";
+            return "Rechazo: El horario debe estar entre 08:00 y 23:00 (duración de 1 a 3 horas).";
         }
-        if (cantParticipantes > cancha.getCapacidadMax()) {
+        if (cantParticipantes < 1 || cantParticipantes > cancha.getCapacidadMax()) {
             return "Rechazo: La cantidad de participantes (" + cantParticipantes +
-                   ") supera la capacidad máxima de la cancha (" + cancha.getCapacidadMax() + ").";
-        }
-        if (hayCruceHorario(cancha.getCodigo(), fecha, horaInicio, duracion)) {
-            return "Rechazo: La cancha " + cancha.getCodigo() +
-                   " ya está reservada en ese horario para la fecha " + fecha + ".";
+                   ") debe estar entre 1 y " + cancha.getCapacidadMax() + ".";
         }
 
-        // Si cumple todas las validaciones (RF05)
+        Reserva conflicto = buscarReservaEnCruce(cancha.getCodigo(), fecha, horaInicio, duracion);
+        if (conflicto != null) {
+            return "Rechazo: La cancha " + cancha.getCodigo() +
+                   " ya está reservada de " + conflicto.getHoraInicio() + ":00 a " +
+                   conflicto.getHoraFin() + ":00 para la fecha " + fecha + ".";
+        }
+
         Reserva nueva = new Reserva(contadorCorrelativo++, titular, cancha, fecha, horaInicio, duracion);
+        nueva.setRecepcionista(recepcionista);
         lista[cantidad++] = nueva;
-        return ""; // Registro exitoso
+        return "";
     }
 
-    // BUSCAR POR NÚMERO CORRELATIVO
+    // Sobrecarga de compatibilidad
+    public String registrarReserva(Jugador titular, Cancha cancha, String fecha,
+                                   int horaInicio, int duracion, int cantParticipantes) {
+        return registrarReserva(titular, cancha, fecha, horaInicio, duracion, cantParticipantes, null);
+    }
+
+    // Sincroniza titular si el jugador ascendió a JugadorFrecuente
+    public void actualizarTitular(Jugador jugadorActualizado) {
+        if (jugadorActualizado == null) return;
+        for (int i = 0; i < cantidad; i++) {
+            if (lista[i].getTitular().getDni().equalsIgnoreCase(jugadorActualizado.getDni()) &&
+                !lista[i].estaCerrada()) {
+                lista[i].setTitular(jugadorActualizado);
+            }
+        }
+    }
+
     public Reserva buscarPorNumero(int numero) {
         for (int i = 0; i < cantidad; i++) {
             if (lista[i].getNumeroCorrelativo() == numero) return lista[i];
@@ -89,7 +133,6 @@ public class GestionReservas {
         return null;
     }
 
-    // ELIMINAR CON DESPLAZAMIENTO HACIA LA IZQUIERDA
     public boolean eliminar(int numero) {
         int pos = -1;
         for (int i = 0; i < cantidad; i++) {

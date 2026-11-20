@@ -3,6 +3,7 @@ package controlador;
 import modelo.Boleta;
 import modelo.Comprobante;
 import modelo.Factura;
+import modelo.Jugador;
 import modelo.Reserva;
 
 public class GestionComprobantes {
@@ -12,7 +13,7 @@ public class GestionComprobantes {
     private int correlativoFactura;
 
     public GestionComprobantes(int capacidad) {
-        this.lista = new Comprobante[capacidad]; // Arreglo en memoria fija
+        this.lista = new Comprobante[capacidad];
         this.cantidad = 0;
         this.correlativoBoleta = 1;
         this.correlativoFactura = 1;
@@ -25,36 +26,71 @@ public class GestionComprobantes {
         return null;
     }
 
-    // EMITIR BOLETA
-    public Boleta emitirBoleta(Reserva r, String fecha, String dni, String nombre) {
-        if (cantidad >= lista.length) return null;
+    public Comprobante buscarPorReserva(int numeroCorrelativo) {
+        for (int i = 0; i < cantidad; i++) {
+            if (lista[i].getReservaAsociada().getNumeroCorrelativo() == numeroCorrelativo) {
+                return lista[i];
+            }
+        }
+        return null;
+    }
 
-        // Genera serie: B001-0001, B001-0002...
+    private boolean puedeFacturarse(Reserva r) {
+        if (r == null) return false;
+        if (buscarPorReserva(r.getNumeroCorrelativo()) != null) return false;
+        return r.getEstado().equals("En Juego") || r.getEstado().equals("Finalizada");
+    }
+
+    private void procesarCierreSiCorresponde(Reserva r, GestionJugadores gj, GestionReservas gr) {
+        if (r.getEstado().equals("En Juego")) {
+            r.finalizarPartido();
+            if (gj != null) {
+                Jugador actualizado = gj.registrarCierreReserva(r.getTitular().getDni());
+                if (gr != null && actualizado != null) {
+                    gr.actualizarTitular(actualizado);
+                }
+            }
+        }
+    }
+
+    // EMITIR BOLETA (con actualización de jugador frecuente)
+    public Boleta emitirBoleta(Reserva r, String fecha, String dni, String nombre,
+                               GestionJugadores gj, GestionReservas gr) {
+        if (cantidad >= lista.length || !puedeFacturarse(r)) return null;
+
         String serie = String.format("B001-%04d", correlativoBoleta++);
         Boleta b = new Boleta(serie, r, fecha, dni, nombre);
 
         lista[cantidad++] = b;
-        r.finalizarPartido(); // La reserva pasa a Finalizada y la cancha a Disponible
+        procesarCierreSiCorresponde(r, gj, gr);
         return b;
     }
 
-    // EMITIR FACTURA (Valida que el RUC tenga 11 dígitos según RF07)
-    public Factura emitirFactura(Reserva r, String fecha, String ruc, String razonSocial) {
-        if (cantidad >= lista.length) return null;
-        if (ruc == null || ruc.trim().length() != 11) {
-            return null; // RUC inválido
-        }
+    // Sobrecarga de compatibilidad
+    public Boleta emitirBoleta(Reserva r, String fecha, String dni, String nombre) {
+        return emitirBoleta(r, fecha, dni, nombre, null, null);
+    }
 
-        // Genera serie: F001-0001, F001-0002...
+    // EMITIR FACTURA (valida RUC de 11 dígitos y razón social - RF07)
+    public Factura emitirFactura(Reserva r, String fecha, String ruc, String razonSocial,
+                                 GestionJugadores gj, GestionReservas gr) {
+        if (cantidad >= lista.length || !puedeFacturarse(r)) return null;
+        if (ruc == null || ruc.trim().length() != 11) return null;
+        if (razonSocial == null || razonSocial.trim().isEmpty()) return null;
+
         String serie = String.format("F001-%04d", correlativoFactura++);
-        Factura f = new Factura(serie, r, fecha, ruc, razonSocial);
+        Factura f = new Factura(serie, r, fecha, ruc.trim(), razonSocial.trim());
 
         lista[cantidad++] = f;
-        r.finalizarPartido(); // La reserva pasa a Finalizada y la cancha a Disponible
+        procesarCierreSiCorresponde(r, gj, gr);
         return f;
     }
 
-    // BUSCAR POR SERIE
+    // Sobrecarga de compatibilidad
+    public Factura emitirFactura(Reserva r, String fecha, String ruc, String razonSocial) {
+        return emitirFactura(r, fecha, ruc, razonSocial, null, null);
+    }
+
     public Comprobante buscarPorSerie(String serie) {
         for (int i = 0; i < cantidad; i++) {
             if (lista[i].getNumeroSerie().equalsIgnoreCase(serie)) {
@@ -64,10 +100,9 @@ public class GestionComprobantes {
         return null;
     }
 
-    // LISTAR TODOS LOS COMPROBANTES
     public void mostrarTodos() {
         for (int i = 0; i < cantidad; i++) {
-            lista[i].imprimirDetalle(); // Polimorfismo puro en ejecución
+            lista[i].imprimirDetalle();
         }
     }
 }

@@ -17,7 +17,6 @@ public abstract class Jugador {
         this.reservasFinalizadas = reservasFinalizadas;
     }
 
-    // Método polimórfico clave: cada subclase define su descuento
     public abstract double getPorcentajeDescuento();
     public abstract String getTipo();
 
@@ -33,13 +32,15 @@ public abstract class Jugador {
     public String getCorreo() { return correo; }
     public int getReservasFinalizadas() { return reservasFinalizadas; }
 
+    public void setNombres(String nombres) { this.nombres = nombres; }
+    public void setApellidos(String apellidos) { this.apellidos = apellidos; }
     public void setTelefono(String telefono) { this.telefono = telefono; }
     public void setCorreo(String correo) { this.correo = correo; }
 
     public void verInfo() {
         System.out.println("[" + getTipo() + "] DNI: " + dni +
-                           " | " + nombres + " " + apellidos +
-                           " | Reservas: " + reservasFinalizadas +
-                           " | Dcto: " + (getPorcentajeDescuento() * 100) + "%");
+                " | " + nombres + " " + apellidos +
+                " | Reservas: " + reservasFinalizadas +
+                " | Dcto: " + (getPorcentajeDescuento() * 100) + "%");
     }
 }

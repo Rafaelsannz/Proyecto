@@ -7,31 +7,38 @@ public class GestionCanchas {
     private int cantidad;
 
     public GestionCanchas(int capacidad) {
-        this.lista = new Cancha[capacidad]; // Capacidad fija en memoria
+        this.lista = new Cancha[capacidad];
         this.cantidad = 0;
     }
 
-    public int getCantidad() {
-        return cantidad;
-    }
+    public int getCantidad() { return cantidad; }
 
     public Cancha obtener(int index) {
-        if (index >= 0 && index < cantidad) {
-            return lista[index];
-        }
+        if (index >= 0 && index < cantidad) return lista[index];
         return null;
     }
 
-    // 1. REGISTRAR (Validando que no se repita el código ni se desborde el arreglo)
+    // 1. REGISTRAR
     public boolean registrar(Cancha nueva) {
-        if (cantidad >= lista.length) return false;
-        if (buscarPosicion(nueva.getCodigo()) != -1) return false; // Código ya existe
+        if (nueva == null || cantidad >= lista.length) return false;
+        if (buscarPosicion(nueva.getCodigo()) != -1) return false;
 
         lista[cantidad++] = nueva;
         return true;
     }
 
-    // 2. BUSCAR POR CÓDIGO (Retorna el índice)
+    // 2. MODIFICAR (RF02)
+    public boolean modificar(String codigo, String nombre, double tarifaBaseHora, String estado) {
+        Cancha c = buscarPorCodigo(codigo);
+        if (c == null || tarifaBaseHora <= 0) return false;
+
+        c.setNombre(nombre);
+        c.setTarifaBaseHora(tarifaBaseHora);
+        c.setEstado(estado);
+        return true;
+    }
+
+    // 3. BUSCAR POSICIÓN POR CÓDIGO
     public int buscarPosicion(String codigo) {
         for (int i = 0; i < cantidad; i++) {
             if (lista[i].getCodigo().equalsIgnoreCase(codigo)) {
@@ -41,16 +48,14 @@ public class GestionCanchas {
         return -1;
     }
 
-    // 3. BUSCAR OBJETO CANCHA
+    // 4. BUSCAR OBJETO CANCHA
     public Cancha buscarPorCodigo(String codigo) {
         int pos = buscarPosicion(codigo);
-        if (pos != -1) {
-            return lista[pos];
-        }
+        if (pos != -1) return lista[pos];
         return null;
     }
 
-    // 4. ELIMINAR CON DESPLAZAMIENTO HACIA LA IZQUIERDA
+    // 5. ELIMINAR CON DESPLAZAMIENTO HACIA LA IZQUIERDA
     public boolean eliminar(String codigo) {
         int pos = buscarPosicion(codigo);
         if (pos == -1) return false;
@@ -63,7 +68,7 @@ public class GestionCanchas {
         return true;
     }
 
-    // 5. LISTAR TODAS LAS CANCHAS (Aprovechando polimorfismo)
+    // 6. LISTAR TODAS LAS CANCHAS
     public void listarCanchas() {
         for (int i = 0; i < cantidad; i++) {
             lista[i].verInfo();

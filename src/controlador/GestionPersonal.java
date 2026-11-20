@@ -18,9 +18,9 @@ public class GestionPersonal {
         return null;
     }
 
-    // 1. REGISTRAR (Valida capacidad, DNI único y usuario único según RF01)
+    // 1. REGISTRAR (DNI único y usuario único - RF01)
     public boolean registrar(Empleado e) {
-        if (cantidad >= lista.length) return false;
+        if (e == null || cantidad >= lista.length) return false;
         if (buscarPorDni(e.getDni()) != null) return false;
         if (buscarPorUsuario(e.getUsuario()) != null) return false;
 
@@ -28,7 +28,20 @@ public class GestionPersonal {
         return true;
     }
 
-    // 2. BUSCAR POR DNI
+    // 2. MODIFICAR (RF01)
+    public boolean modificar(String dni, String nombres, String apellidos, String password) {
+        Empleado e = buscarPorDni(dni);
+        if (e == null) return false;
+
+        e.setNombres(nombres);
+        e.setApellidos(apellidos);
+        if (password != null && !password.trim().isEmpty()) {
+            e.setPassword(password);
+        }
+        return true;
+    }
+
+    // 3. BUSCAR POR DNI
     public Empleado buscarPorDni(String dni) {
         for (int i = 0; i < cantidad; i++) {
             if (lista[i].getDni().equalsIgnoreCase(dni)) return lista[i];
@@ -36,7 +49,7 @@ public class GestionPersonal {
         return null;
     }
 
-    // 3. BUSCAR POR USUARIO (Para Login)
+    // 4. BUSCAR POR USUARIO (Para Login)
     public Empleado buscarPorUsuario(String user) {
         for (int i = 0; i < cantidad; i++) {
             if (lista[i].getUsuario().equals(user)) return lista[i];
@@ -44,7 +57,7 @@ public class GestionPersonal {
         return null;
     }
 
-    // 4. ELIMINAR CON DESPLAZAMIENTO HACIA LA IZQUIERDA
+    // 5. ELIMINAR CON DESPLAZAMIENTO HACIA LA IZQUIERDA
     public boolean eliminar(String dni) {
         int pos = -1;
         for (int i = 0; i < cantidad; i++) {
@@ -63,11 +76,11 @@ public class GestionPersonal {
         return true;
     }
 
-    // 5. LOGIN AUTENTICACIÓN (RF10)
+    // 6. LOGIN AUTENTICACIÓN (RF10)
     public Empleado autenticar(String user, String pass) {
         Empleado e = buscarPorUsuario(user);
         if (e != null && e.autenticar(user, pass)) {
-            return e; // Retorna el empleado con su rol
+            return e;
         }
         return null;
     }

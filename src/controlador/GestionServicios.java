@@ -23,10 +23,20 @@ public class GestionServicios {
     // ==========================================
 
     public boolean registrarServicio(ServicioAdicional s) {
-        if (cantServicios >= listaServicios.length) return false;
-        if (buscarServicio(s.getCodigo()) != null) return false; // Código único
+        if (s == null || cantServicios >= listaServicios.length) return false;
+        if (buscarServicio(s.getCodigo()) != null) return false;
 
         listaServicios[cantServicios++] = s;
+        return true;
+    }
+
+    public boolean modificarServicio(String codigo, String nombre, double precioUnitario, int stockDisponible) {
+        ServicioAdicional s = buscarServicio(codigo);
+        if (s == null || precioUnitario < 0 || stockDisponible < 0) return false;
+
+        s.setNombre(nombre);
+        s.setPrecioUnitario(precioUnitario);
+        s.setStockDisponible(stockDisponible);
         return true;
     }
 
@@ -49,7 +59,6 @@ public class GestionServicios {
         }
         if (pos == -1) return false;
 
-        // Desplazamiento hacia la izquierda
         for (int i = pos; i < cantServicios - 1; i++) {
             listaServicios[i] = listaServicios[i + 1];
         }
@@ -63,10 +72,19 @@ public class GestionServicios {
     // ==========================================
 
     public boolean registrarPaquete(PaquetePromocional p) {
-        if (cantPaquetes >= listaPaquetes.length) return false;
-        if (buscarPaquete(p.getCodigo()) != null) return false; // Código único
+        if (p == null || cantPaquetes >= listaPaquetes.length) return false;
+        if (buscarPaquete(p.getCodigo()) != null) return false;
 
         listaPaquetes[cantPaquetes++] = p;
+        return true;
+    }
+
+    public boolean modificarPaquete(String codigo, String nombre, double precioPromocional) {
+        PaquetePromocional p = buscarPaquete(codigo);
+        if (p == null || precioPromocional < 0) return false;
+
+        p.setNombre(nombre);
+        p.setPrecioPromocional(precioPromocional);
         return true;
     }
 
@@ -89,7 +107,6 @@ public class GestionServicios {
         }
         if (pos == -1) return false;
 
-        // Desplazamiento hacia la izquierda
         for (int i = pos; i < cantPaquetes - 1; i++) {
             listaPaquetes[i] = listaPaquetes[i + 1];
         }
@@ -98,7 +115,6 @@ public class GestionServicios {
         return true;
     }
 
-    // Getters para recorrer en tablas o listados de la GUI
     public int getCantServicios() { return cantServicios; }
     public int getCantPaquetes() { return cantPaquetes; }
 
