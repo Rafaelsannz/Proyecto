@@ -1,0 +1,8 @@
+# Carpetas de compilación y salida
+build/
+dist/
+target/
+*.class
+
+# Caché local de NetBeans
+nbproject/private/
